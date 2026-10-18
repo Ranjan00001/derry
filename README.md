@@ -17,9 +17,12 @@ A persistent, always-on-top AI assistant panel designed strictly for Linux. It a
 
 ## Features
 - **Sticky UI:** Always-on-top, draggable chat panel.
-- **Multimodal:** Text and voice input capabilities (Vosk).
+- **Streaming Chat:** Responses stream in token-by-token and render as markdown chat bubbles.
+- **Multimodal:** Text and voice input capabilities (Vosk), with a mic toggle button and a continuous hands-free listening mode.
 - **Gemini AI:** Intelligent reasoning behind system actions.
 - **Safe Execution Engine:** Securely runs whitelist-approved Linux commands.
+
+> Streaming and markdown rendering use the `markdown` package, installed automatically with `pip install -e .`.
 
 ## Running
 Once installed, simply run:
