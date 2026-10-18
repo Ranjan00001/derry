@@ -11,7 +11,8 @@ setup(
         "google-generativeai>=0.3.0",
         "vosk>=0.3.45",
         "python-dotenv>=1.0.0",
-        "sounddevice>=0.4.6"
+        "sounddevice>=0.4.6",
+        "markdown>=3.5",
     ],
     entry_points={
         "console_scripts": [

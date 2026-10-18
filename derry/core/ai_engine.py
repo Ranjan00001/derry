@@ -56,6 +56,7 @@ class AIEngine:
         self.chat = self.model.start_chat()
 
     def generate_response(self, prompt: str) -> str:
+        """Non-streaming call — used internally for command-intent detection."""
         if not self.model:
             return "Error: Gemini API key is not configured. Please check your .env file."
         
@@ -66,3 +67,22 @@ class AIEngine:
         except Exception as e:
             logger.error(f"Error communicating with Gemini API: {e}")
             return f"I encountered an error while thinking: {str(e)}"
+
+    def stream_response(self, prompt: str):
+        """
+        Yields text chunks from Gemini as they arrive.
+        Mirrors PyGPT's streaming approach — no extra deps, uses the existing SDK.
+        """
+        if not self.model:
+            yield "Error: GEMINI_API_KEY is not configured. Please check your .env file."
+            return
+        try:
+            logger.debug(f"Streaming prompt to Gemini: {prompt[:80]}...")
+            response = self.chat.send_message(prompt, stream=True)
+            logger.info(response)
+            for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+        except Exception as e:
+            logger.error(f"Streaming error: {e}")
+            yield f"I encountered an error while thinking: {str(e)}"

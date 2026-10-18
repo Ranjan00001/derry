@@ -16,11 +16,16 @@ class VoiceEngine(QThread):
     listening_stopped = pyqtSignal()
     error_occurred = pyqtSignal(str)
 
-    def __init__(self, model_path="model"):
+    def __init__(self, model_path="model", continuous: bool = False):
         super().__init__()
         self.model_path = model_path
         self._is_running = False
+        self._continuous = continuous
         self.q = queue.Queue()
+
+    def set_continuous(self, enabled: bool):
+        """Toggle continuous listening. False = walkie-talkie (stop after one phrase)."""
+        self._continuous = enabled
 
     def _ensure_model(self):
         """Downloads a small vosk model if it doesn't exist."""
@@ -98,8 +103,10 @@ class VoiceEngine(QThread):
                         if text:
                             logger.debug(f"Recognized: {text}")
                             self.text_recognized.emit(text)
-                            # Stop after recognizing one full phrase to act like a walkie-talkie
-                            self._is_running = False
+                            # In walkie-talkie mode stop after one phrase;
+                            # in continuous mode keep listening until stopped manually.
+                            if not self._continuous:
+                                self._is_running = False
                             
             self.listening_stopped.emit()
 
