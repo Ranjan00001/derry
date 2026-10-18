@@ -8,7 +8,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "PyQt6>=6.0.0",
-        "google-generativeai>=0.3.0",
+        "google-genai>=1.0.0",
         "vosk>=0.3.45",
         "python-dotenv>=1.0.0",
         "sounddevice>=0.4.6",

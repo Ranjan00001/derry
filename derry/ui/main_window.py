@@ -22,13 +22,13 @@ logger = get_logger(__name__)
 
 class AIStreamTask(QThread):
     """
-    Runs Gemini streaming in a background QThread.
+    Runs Gemini streaming (with tool calls) in a background QThread.
 
     Signal protocol drives bubble lifecycle in the main thread:
       chunk_received  → append token to current streaming bubble
       bubble_finalize → finalize current bubble (with optional override text)
-      new_bubble      → command found; create fresh AI bubble below system msg
-      system_message  → add a System bubble (command result)
+      new_bubble      → tool ran; create fresh AI bubble below system msg
+      system_message  → add a System bubble (tool output)
       all_done        → whole task finished; re-enable input
     """
     chunk_received  = pyqtSignal(str)
@@ -44,32 +44,23 @@ class AIStreamTask(QThread):
         self.message        = message
 
     def run(self):
-        msg = self.message
-
-        for _ in range(5):      # guard against runaway command loops
-            full = ""
-            for chunk in self.ai_engine.stream_response(msg):
-                full += chunk
-                self.chunk_received.emit(chunk)
-
-            was_cmd, result, clean = self.command_engine.parse_and_execute(full)
-
-            if was_cmd:
-                # Replace the streamed JSON with the human-readable prefix text
-                self.bubble_finalize.emit(clean)
-                # Truncate very long results so the follow-up prompt stays sane
-                truncated = result[:1200] + ("…" if len(result) > 1200 else "")
-                self.system_message.emit(f"⚙️ {truncated}")
-                # Ask for a fresh bubble for the follow-up answer
-                self.new_bubble.emit()
-                msg = (
-                    f"Command Output:\n{result}\n\n"
-                    "Summarise the result for the user in a short, friendly sentence."
-                )
-            else:
-                # Stream is the final answer — convert to Markdown
-                self.bubble_finalize.emit("")
-                break
+        try:
+            for event in self.ai_engine.stream_reply(self.message):
+                if event[0] == "text":
+                    self.chunk_received.emit(event[1])
+                else:  # ("tool", name, args, result)
+                    _, name, args, result = event
+                    arg_s = ", ".join(f"{k}={v}" for k, v in (args or {}).items())
+                    label = f"⚙️ {name}({arg_s})" if arg_s else f"⚙️ {name}"
+                    self.bubble_finalize.emit(label)
+                    # Truncate very long results so the follow-up prompt stays sane
+                    truncated = result[:1200] + ("…" if len(result) > 1200 else "")
+                    self.system_message.emit(f"⚙️ {truncated}")
+                    # Ask for a fresh bubble for the follow-up answer
+                    self.new_bubble.emit()
+        except Exception as e:
+            logger.error(f"AIStreamTask failed: {e}")
+            self.chunk_received.emit(f"I encountered an unexpected error: {e}")
 
         self.all_done.emit()
 
@@ -84,7 +75,7 @@ class DerryMainWindow(QMainWindow):
         # Core engines
         self.command_engine = CommandEngine()
         self.ai_engine      = AIEngine(self.command_engine)
-        self.voice_engine   = VoiceEngine()
+        self.voice_engine   = VoiceEngine(continuous=True)
         self.system_monitor = SystemMonitor()
         self.system_monitor.alert_triggered.connect(self._on_system_alert)
         # self.system_monitor.start() # Stopping this for now
@@ -164,6 +155,7 @@ class DerryMainWindow(QMainWindow):
             lambda: self.chat_widget.set_mic_listening(False)
         )
         self.voice_engine.text_recognized.connect(self._on_voice_text)
+        self.voice_engine.partial_text.connect(self._on_voice_partial)
         self.voice_engine.error_occurred.connect(self._on_voice_error)
 
         # Greeting
@@ -228,8 +220,9 @@ class DerryMainWindow(QMainWindow):
         self.chat_widget.set_input_enabled(False)
         self.chat_widget.start_scroll_tracking()
 
-        # Create the first streaming AI bubble
-        self._current_ai_bubble = self.chat_widget.add_streaming_bubble("AI")
+        # Create the first streaming AI bubble with a "Thinking…" placeholder;
+        # the placeholder is cleared automatically on the first streamed chunk.
+        self._current_ai_bubble = self.chat_widget.add_streaming_bubble("AI", thinking=True)
 
         self.ai_task = AIStreamTask(self.ai_engine, self.command_engine, msg)
         self.ai_task.chunk_received.connect(self._on_chunk)
@@ -281,6 +274,11 @@ class DerryMainWindow(QMainWindow):
         if self.chat_widget.send_btn.isEnabled():
             self.handle_user_message(text)
         else:
+            self.chat_widget.input_field.setText(text)
+
+    def _on_voice_partial(self, text: str):
+        """Live partial transcription — show it in the input field while listening."""
+        if self.chat_widget.send_btn.isEnabled():
             self.chat_widget.input_field.setText(text)
 
     def _on_voice_error(self, err: str):

@@ -1,26 +1,146 @@
 {
-  "open_terminal": ["gnome-terminal"],
-  "lock_screen": ["xdg-screensaver", "lock"],
-  "check_battery": ["upower", "-i", "/org/freedesktop/UPower/devices/battery_BAT0"],
-  "open_browser": ["xdg-open", "http://google.com"],
-  "system_info": ["uname", "-a"],
-  "free_memory": ["free", "-m"],
-  "disk_space": ["df", "-h"],
-  "list_files": ["ls", "-la"],
-  "current_directory": ["pwd"],
-  "network_status": ["nmcli", "connection", "show"],
-  "ping_google": ["ping", "-c", "4", "google.com"],
-  "cpu_info": ["lscpu"],
-  "uptime": ["uptime"],
-  "whoami": ["whoami"],
-  "date_time": ["date"],
-  "open_calculator": ["gnome-calculator"],
-  "open_settings": ["gnome-control-center"],
-  "open_file_manager": ["xdg-open", "."],
-  "volume_up": ["amixer", "-q", "sset", "Master", "5%+"],
-  "volume_down": ["amixer", "-q", "sset", "Master", "5%-"],
-  "volume_mute": ["amixer", "-q", "sset", "Master", "toggle"],
-  "suspend_system": ["systemctl", "suspend"],
-  "bluetooth_status": ["bluetoothctl", "show"],
-  "list_usb": ["lsusb"]
+  "open_terminal": {
+    "description": "Open a new GNOME terminal window.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["gnome-terminal"]
+  },
+  "lock_screen": {
+    "description": "Lock the desktop screen immediately.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["xdg-screensaver", "lock"]
+  },
+  "check_battery": {
+    "description": "Check the laptop battery status and charge level.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["upower", "-i", "/org/freedesktop/UPower/devices/battery_BAT0"]
+  },
+  "open_browser": {
+    "description": "Open a URL in the default web browser.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "url": {"type": "string", "description": "The full URL to open, including https://"}
+      },
+      "required": ["url"]
+    },
+    "argv": ["xdg-open", "{url}"]
+  },
+  "system_info": {
+    "description": "Show basic system information (kernel, hostname, architecture).",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["uname", "-a"]
+  },
+  "free_memory": {
+    "description": "Show free and used memory in megabytes.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["free", "-m"]
+  },
+  "disk_space": {
+    "description": "Show disk space usage for all mounted filesystems.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["df", "-h"]
+  },
+  "list_files": {
+    "description": "List files and directories (with details) at a given path.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string", "description": "Absolute path of the directory to list, e.g. /home/user"}
+      },
+      "required": ["path"]
+    },
+    "argv": ["ls", "-la", "{path}"]
+  },
+  "current_directory": {
+    "description": "Print the current working directory.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["pwd"]
+  },
+  "network_status": {
+    "description": "List NetworkManager connections and their status.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["nmcli", "connection", "show"]
+  },
+  "ping_host": {
+    "description": "Ping a host 4 times to test network reachability.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "host": {"type": "string", "description": "Hostname or IP address to ping, e.g. google.com"}
+      },
+      "required": ["host"]
+    },
+    "argv": ["ping", "-c", "4", "{host}"]
+  },
+  "cpu_info": {
+    "description": "Show CPU information (model, cores, threads, clock speeds).",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["lscpu"]
+  },
+  "uptime": {
+    "description": "Show how long the system has been running and the load average.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["uptime"]
+  },
+  "whoami": {
+    "description": "Print the current username.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["whoami"]
+  },
+  "date_time": {
+    "description": "Show the current date and time.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["date"]
+  },
+  "open_calculator": {
+    "description": "Open the GNOME calculator app.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["gnome-calculator"]
+  },
+  "open_settings": {
+    "description": "Open the GNOME system settings app.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["gnome-control-center"]
+  },
+  "open_file_manager": {
+    "description": "Open the file manager at a given path (defaults to the home directory).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {"type": "string", "description": "Absolute path to open in the file manager."}
+      }
+    },
+    "defaults": {"path": "~"},
+    "argv": ["xdg-open", "{path}"]
+  },
+  "volume_up": {
+    "description": "Raise the system volume by 5%.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["amixer", "-q", "sset", "Master", "5%+"]
+  },
+  "volume_down": {
+    "description": "Lower the system volume by 5%.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["amixer", "-q", "sset", "Master", "5%-"]
+  },
+  "volume_mute": {
+    "description": "Toggle mute on the system volume.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["amixer", "-q", "sset", "Master", "toggle"]
+  },
+  "suspend_system": {
+    "description": "Suspend (put to sleep) the computer.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["systemctl", "suspend"]
+  },
+  "bluetooth_status": {
+    "description": "Show the Bluetooth adapter status.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["bluetoothctl", "show"]
+  },
+  "list_usb": {
+    "description": "List connected USB devices.",
+    "parameters": {"type": "object", "properties": {}},
+    "argv": ["lsusb"]
+  }
 }

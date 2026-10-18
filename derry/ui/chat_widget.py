@@ -66,6 +66,7 @@ class ChatBubble(QFrame):
         self._sender = sender
         self._raw: str = ""
         self._finalized = False
+        self._thinking = False
 
         bg  = _BUBBLE_BG.get(sender, "#2A2A2A")
         lcl = _LABEL_COL.get(sender, "#AAAAAA")
@@ -116,9 +117,21 @@ class ChatBubble(QFrame):
 
     # ── Public API ────────────────────────────────────────────────────────────
 
+    def set_thinking(self, on: bool):
+        """Show/replace content with a 'Thinking…' placeholder (cleared on first chunk)."""
+        self._thinking = on
+        if on:
+            self._raw = ""
+            self._finalized = False
+            self.browser.setHtml(
+                _MD_CSS
+                + "<p style='color:#888;font-style:italic;'>Thinking…</p>"
+            )
+
     def set_text(self, text: str):
         """Render text as Markdown HTML (replaces all existing content)."""
         self._raw = text
+        self._thinking = False
         html = _md_convert(text, extensions=["fenced_code", "nl2br"])
         self.browser.setHtml(_MD_CSS + html)
 
@@ -127,11 +140,16 @@ class ChatBubble(QFrame):
         Append a raw streaming chunk as plain text (fast path).
         Call finalize() after streaming ends for proper Markdown rendering.
         """
+        if self._thinking:
+            # First real token arrived — drop the Thinking… placeholder
+            self._thinking = False
+            self.browser.clear()
         self._raw += chunk
         cursor = self.browser.textCursor()
         cursor.movePosition(cursor.MoveOperation.End)
         self.browser.setTextCursor(cursor)
         self.browser.insertPlainText(chunk)
+        self.browser.viewport().update()
 
     def finalize(self):
         """Convert accumulated streamed plain text to Markdown HTML."""
@@ -233,9 +251,12 @@ class ChatWidget(QWidget):
         self._scroll_later()
         return bubble
 
-    def add_streaming_bubble(self, sender: str) -> ChatBubble:
+    def add_streaming_bubble(self, sender: str, thinking: bool = False) -> ChatBubble:
         """Add an empty bubble ready to receive live streaming chunks."""
-        return self.add_bubble(sender)
+        bubble = self.add_bubble(sender)
+        if thinking:
+            bubble.set_thinking(True)
+        return bubble
 
     # ── Scroll helpers ────────────────────────────────────────────────────────
 
