@@ -41,7 +41,12 @@ class VoiceEngine(QThread):
         self._is_running = False
         self._continuous = continuous
         self._last_partial = ""
+        self._muted = False
         self.q = queue.Queue()
+
+    def set_muted(self, muted: bool):
+        """Drop mic frames while Derry is speaking (prevents self-transcription)."""
+        self._muted = muted
 
     def set_continuous(self, enabled: bool):
         """Toggle continuous listening. False = walkie-talkie (stop after one phrase)."""
@@ -87,6 +92,8 @@ class VoiceEngine(QThread):
 
     def _audio_callback(self, indata, frames, time, status):
         """This is called (from a separate thread) for each audio block."""
+        if self._muted:
+            return
         if status:
             logger.warning(f"SoundDevice status: {status}")
         self.q.put(bytes(indata))

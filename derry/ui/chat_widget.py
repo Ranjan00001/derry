@@ -61,6 +61,8 @@ class ChatBubble(QFrame):
       1. set_text(text)       — render Markdown immediately (System/You bubbles)
     """
 
+    speak_requested = pyqtSignal(object)  # emits the ChatBubble itself
+
     def __init__(self, sender: str, text: str = "", parent=None):
         super().__init__(parent)
         self._sender = sender
@@ -86,7 +88,29 @@ class ChatBubble(QFrame):
             f"color:{lcl};font-size:11px;font-weight:bold;background:transparent;"
         )
         lbl.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        vbox.addWidget(lbl)
+
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(2)
+        header.addWidget(lbl)
+        header.addStretch()
+
+        self.speak_btn: QPushButton | None = None
+        if sender == "AI":
+            self.speak_btn = QPushButton("🔊")
+            self.speak_btn.setFixedSize(20, 20)
+            self.speak_btn.setToolTip("Speak this message")
+            self.speak_btn.setStyleSheet(
+                "QPushButton{background:transparent;border:none;font-size:12px;"
+                "color:#80CBC4;border-radius:4px;}"
+                "QPushButton:hover{background:rgba(255,255,255,.12);color:white;}"
+            )
+            self.speak_btn.clicked.connect(
+                lambda: self.speak_requested.emit(self)
+            )
+            header.addWidget(self.speak_btn)
+
+        vbox.addLayout(header)
 
         # Content renderer
         self.browser = QTextBrowser()
@@ -164,12 +188,24 @@ class ChatBubble(QFrame):
         self.browser.clear()
         self.browser.setFixedHeight(24)
 
+    def raw_text(self) -> str:
+        """The accumulated (unsanitized) message text."""
+        return self._raw
+
+    def set_speaking(self, speaking: bool):
+        """Flip the speaker icon while this bubble's text is being spoken."""
+        if self.speak_btn is None:
+            return
+        self.speak_btn.setText("⏹️" if speaking else "🔊")
+        self.speak_btn.setToolTip("Stop speaking" if speaking else "Speak this message")
+
 
 class ChatWidget(QWidget):
     """Main chat interface: scrollable bubble list + input bar."""
 
     message_sent = pyqtSignal(str)
     mic_clicked  = pyqtSignal()
+    speak_requested = pyqtSignal(object)  # ChatBubble whose 🔊 was clicked
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -247,6 +283,7 @@ class ChatWidget(QWidget):
     def add_bubble(self, sender: str, text: str = "") -> ChatBubble:
         """Add a bubble with pre-rendered text."""
         bubble = ChatBubble(sender, text)
+        bubble.speak_requested.connect(self.speak_requested.emit)
         self._blayout.addWidget(bubble)
         self._scroll_later()
         return bubble

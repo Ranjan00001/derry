@@ -16,6 +16,8 @@ from derry.core.ai_engine import AIEngine
 from derry.core.command_engine import CommandEngine
 from derry.core.voice_engine import VoiceEngine
 from derry.core.system_monitor import SystemMonitor
+from derry.core.tts_engine import TTSEngine
+from derry.core.text_utils import text_to_speech_safe
 
 logger = get_logger(__name__)
 
@@ -71,11 +73,13 @@ class DerryMainWindow(QMainWindow):
         super().__init__()
         self.old_pos: QPoint | None = None
         self._current_ai_bubble: ChatBubble | None = None
+        self._speaking_bubble: ChatBubble | None = None
 
         # Core engines
         self.command_engine = CommandEngine()
         self.ai_engine      = AIEngine(self.command_engine)
         self.voice_engine   = VoiceEngine(continuous=True)
+        self.tts_engine     = TTSEngine()
         self.system_monitor = SystemMonitor()
         self.system_monitor.alert_triggered.connect(self._on_system_alert)
         # self.system_monitor.start() # Stopping this for now
@@ -138,6 +142,7 @@ class DerryMainWindow(QMainWindow):
         self.chat_widget = ChatWidget(self)
         self.chat_widget.message_sent.connect(self.handle_user_message)
         self.chat_widget.mic_clicked.connect(self.toggle_voice_input)
+        self.chat_widget.speak_requested.connect(self._on_speak_requested)
         layout.addWidget(self.chat_widget, 1)
 
         # Resize grip (bottom-right corner)
@@ -157,6 +162,16 @@ class DerryMainWindow(QMainWindow):
         self.voice_engine.text_recognized.connect(self._on_voice_text)
         self.voice_engine.partial_text.connect(self._on_voice_partial)
         self.voice_engine.error_occurred.connect(self._on_voice_error)
+
+        # TTS: mute the mic while Derry speaks (no feedback loop)
+        self.tts_engine.speaking_started.connect(
+            lambda: self.voice_engine.set_muted(True)
+        )
+        self.tts_engine.speaking_finished.connect(
+            lambda: self.voice_engine.set_muted(False)
+        )
+        self.tts_engine.speaking_finished.connect(self._on_speaking_finished)
+        self.tts_engine.error_occurred.connect(self._on_tts_error)
 
         # Greeting
         if not self.ai_engine.api_key or self.ai_engine.api_key == "your_api_key_here":
@@ -201,6 +216,8 @@ class DerryMainWindow(QMainWindow):
             self.ai_task.wait()
         if self.voice_engine.isRunning():
             self.voice_engine.stop()
+        if self.tts_engine.isRunning():
+            self.tts_engine.stop()
         if self.system_monitor.isRunning():
             self.system_monitor.stop()
         QApplication.quit()
@@ -283,6 +300,32 @@ class DerryMainWindow(QMainWindow):
 
     def _on_voice_error(self, err: str):
         self.chat_widget.add_bubble("System Error", err)
+
+    # ── Text-to-speech (per-bubble speaker button) ────────────────────────────
+
+    def _on_speak_requested(self, bubble: ChatBubble):
+        """Click 🔊 to speak a bubble, click ⏹ on the same bubble to stop."""
+        if self._speaking_bubble is bubble:
+            self.tts_engine.stop()
+            return
+        self.tts_engine.stop()
+        text = text_to_speech_safe(bubble.raw_text())
+        if not text:
+            return
+        self._speaking_bubble = bubble
+        bubble.set_speaking(True)
+        self.tts_engine.speak(text)
+
+    def _on_speaking_finished(self):
+        if self._speaking_bubble:
+            self._speaking_bubble.set_speaking(False)
+            self._speaking_bubble = None
+
+    def _on_tts_error(self, err: str):
+        self.chat_widget.add_bubble("System Error", err)
+        if self._speaking_bubble:
+            self._speaking_bubble.set_speaking(False)
+            self._speaking_bubble = None
 
     # ── Draggable window ──────────────────────────────────────────────────────
 

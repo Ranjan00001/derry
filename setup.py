@@ -13,6 +13,7 @@ setup(
         "python-dotenv>=1.0.0",
         "sounddevice>=0.4.6",
         "markdown>=3.5",
+        "piper-tts>=1.3.0",
     ],
     entry_points={
         "console_scripts": [
